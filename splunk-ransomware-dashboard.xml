@@ -1,0 +1,92 @@
+<form>
+  <label>Ransomware Posture Status</label>
+  <fieldset submitButton="false">
+    <input type="time" token="field1">
+      <label></label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Failed MFA Authentications</title>
+      <table>
+        <search>
+          <query>sourcetype="okta:im" result.targets{}.login=* result.status=failure | rename result.app_name as App | stats values(result.targets{}.login) as "Users" by App</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Unencrypted Databases</title>
+      <table>
+        <search>
+          <query>| dbxquery query="SELECT * FROM \"sys\".\"databases\"" connection="DB" | eval Encryption_Status = if(is_encrypted == 1, "Encrypted", "Not Encrypted") | where Encryption_Status="Not Encrypted"
+| fields name, Encryption_Status</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>EDR/Sysmon Installation Status</title>
+      <table>
+        <search>
+          <query>source="xmlwineventlog:microsoft-windows-sysmon/operational" | dedup host | eval Sysmon_Installed = if(Name="'Microsoft-Windows-Sysmon'", "Yes", "No")  | eval EDR_Installed = if(Name="EDR", "Yes", "No") | table  host, Sysmon_Installed, EDR_Installed</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Unsuccessful Backups</title>
+      <table>
+        <search>
+          <query>| inputlookup UC_unsuccessful_backups
+| search MESSAGE="An error occurred, failed to backup."
+| bucket _time span=1d
+| stats values(COMPUTERNAME) as "Systems" by MESSAGE  | table *</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Unsuccessful System Updates</title>
+      <table>
+        <search>
+          <query>| inputlookup UC_unsuccessful_windows_updates
+| search signature_id=KB4012598 OR signature_id=KB4012212 OR signature_id=KB4012215 OR signature_id=KB4012213 OR signature_id=KB4012216 OR signature_id=KB4012214 OR signature_id=KB4012217 OR signature_id= KB4012606 OR signature_id=KB4013198 OR signature_id= KB4013429
+| stats last(status) as lastStatus by dest, signature_id
+| search lastStatus=failure</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+</form>
